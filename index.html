@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<title>Warehouse Expenses</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --bg:       #0d1117;
+  --card:     #161b22;
+  --card2:    #21262d;
+  --border:   #30363d;
+  --border2:  #3d444d;
+  --blue:     #2f81f7;
+  --blue2:    #388bfd;
+  --green:    #3fb950;
+  --yellow:   #d29922;
+  --red:      #f85149;
+  --gray:     #8b949e;
+  --text:     #e6edf3;
+  --text2:    #8b949e;
+  --text3:    #484f58;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Sarabun', sans-serif;
+  --radius:   10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom, 24px);
+  overflow-x: hidden;
+}
+
+/* ─── PIN SCREEN ─────────────────────────────────────────── */
+#pinScreen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 32px 24px;
+  gap: 0;
+}
+.pin-logo {
+  width: 64px; height: 64px; border-radius: 18px;
+  background: linear-gradient(135deg,#1f4068,var(--blue));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(47,129,247,.3);
+}
+.pin-title {
+  font-size: 20px; font-weight: 600; margin-bottom: 6px; text-align: center;
+}
+.pin-sub {
+  font-size: 13px; color: var(--text2); margin-bottom: 32px; text-align: center;
+}
+.pin-dots {
+  display: flex; gap: 14px; margin-bottom: 32px;
+}
+.pin-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--border2);
+  background: transparent;
+  transition: all .15s;
+}
+.pin-dot.filled {
+  background: var(--blue);
+  border-color: var(--blue);
+  transform: scale(1.1);
+}
+.pin-dot.error {
+  background: var(--red);
+  border-color: var(--red);
+  animation: shake .35s ease;
+}
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-6px)}
+  40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
+
+/* Numpad */
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  grid-template-rows: repeat(4, 72px);
+  gap: 12px;
+}
+.num-btn {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 22px; font-weight: 500;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .12s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.num-btn:active { background: var(--border); transform: scale(.93); }
+.num-btn.del { font-size: 18px; background: transparent; border-color: transparent; color: var(--text2); }
+.num-btn.del:active { background: var(--card2); }
+.num-btn.empty { visibility: hidden; }
+
+.pin-error-msg {
+  margin-top: 20px;
+  font-size: 12px; color: var(--red);
+  font-family: var(--mono);
+  min-height: 18px; text-align: center;
+}
+
+/* Setup PIN mode */
+.pin-setup-step {
+  font-size: 11px; font-family: var(--mono);
+  color: var(--blue); text-transform: uppercase;
+  letter-spacing: .08em; margin-bottom: 8px;
+  text-align: center;
+}
+
+#appContent { display: none; }
+
+/* ─── HEADER ─────────────────────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 200;
+  background: rgba(13,17,23,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; }
+.logo {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: linear-gradient(135deg,#1f4068,var(--blue));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.topbar h1 { font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+.topbar p  { font-size: 11px; color: var(--text2); font-family: var(--mono); }
+.gear-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--card2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; flex-shrink: 0;
+  transition: background .15s;
+}
+.gear-btn:active { background: var(--border); }
+
+/* ─── SETTINGS DRAWER ────────────────────────────────────── */
+.drawer-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(4px);
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s;
+}
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 400;
+  width: min(320px, 92vw);
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+  overflow-y: auto;
+  padding: 0 0 32px;
+}
+.drawer.open { transform: translateX(0); }
+
+.drawer-header {
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; background: var(--card);
+}
+.drawer-header span { font-size: 14px; font-weight: 600; }
+.close-btn {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--card2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 14px; color: var(--text2);
+}
+
+.drawer-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+label.field-label {
+  display: block;
+  font-size: 10px; font-family: var(--mono);
+  color: var(--text2); text-transform: uppercase;
+  letter-spacing: .08em; margin-bottom: 6px;
+}
+input.field-input, select.field-input {
+  width: 100%;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px;
+  color: var(--text); font-family: var(--sans); font-size: 13px;
+  outline: none; -webkit-appearance: none; appearance: none;
+  transition: border-color .15s;
+}
+input.field-input:focus, select.field-input:focus { border-color: var(--blue); }
+input.field-input::placeholder { color: var(--text3); }
+
+.save-config-btn {
+  width: 100%; padding: 10px;
+  background: var(--blue); color: #fff;
+  border: none; border-radius: 8px;
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: opacity .15s;
+}
+.save-config-btn:active { opacity: .8; }
+
+.status-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-family: var(--mono);
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--text2);
+}
+.status-chip.ok { border-color: var(--green); color: var(--green); }
+.status-chip.err { border-color: var(--red); color: var(--red); }
+.status-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ─── MAIN CONTENT ───────────────────────────────────────── */
+.main { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ─── UPLOAD ZONE ────────────────────────────────────────── */
+.upload-zone {
+  position: relative;
+  background: var(--card);
+  border: 1.5px dashed var(--border2);
+  border-radius: 14px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  overflow: hidden;
+}
+.upload-zone.drag { border-color: var(--blue); background: rgba(47,129,247,.06); }
+.upload-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0;
+  width: 100%; height: 100%; cursor: pointer;
+}
+.upload-icon { font-size: 36px; margin-bottom: 8px; }
+.upload-title { font-size: 15px; font-weight: 600; }
+.upload-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.upload-badge {
+  display: inline-block; margin-top: 10px;
+  padding: 3px 12px; border-radius: 999px;
+  background: rgba(47,129,247,.15); border: 1px solid rgba(47,129,247,.3);
+  font-size: 11px; font-family: var(--mono); color: var(--blue2);
+}
+
+/* ─── QUEUE ──────────────────────────────────────────────── */
+.section-label {
+  font-size: 10px; font-family: var(--mono);
+  color: var(--text2); text-transform: uppercase;
+  letter-spacing: .08em;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.badge {
+  background: var(--blue); color: #fff;
+  font-size: 10px; font-weight: 700; font-family: var(--mono);
+  padding: 1px 7px; border-radius: 999px;
+}
+
+.queue-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  display: flex; align-items: center; gap: 11px;
+  transition: border-color .2s;
+}
+.queue-item.processing { border-color: var(--yellow); }
+.queue-item.done       { border-color: var(--green); }
+.queue-item.skipped    { border-color: var(--text3); opacity: .7; }
+.queue-item.error      { border-color: var(--red); }
+
+.thumb {
+  width: 42px; height: 42px; border-radius: 7px;
+  background: var(--card2); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; overflow: hidden;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 7px; }
+
+.item-body { flex: 1; min-width: 0; }
+.item-name {
+  font-size: 12px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.item-sub {
+  font-size: 11px; color: var(--text2);
+  font-family: var(--mono); margin-top: 2px;
+}
+.item-sub.ok   { color: var(--green); }
+.item-sub.warn { color: var(--yellow); }
+.item-sub.err  { color: var(--red); }
+.item-sub.dim  { color: var(--text3); }
+
+.dot-status {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text3); flex-shrink: 0;
+}
+.dot-status.processing { background: var(--yellow); animation: blink 1s infinite; }
+.dot-status.done       { background: var(--green); }
+.dot-status.skipped    { background: var(--text3); }
+.dot-status.error      { background: var(--red); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ─── SUMMARY ────────────────────────────────────────────── */
+.summary {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: none;
+}
+.summary.show { display: block; }
+.summary-title {
+  font-size: 10px; font-family: var(--mono);
+  color: var(--text2); text-transform: uppercase;
+  letter-spacing: .08em; margin-bottom: 12px;
+}
+.summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.stat { text-align: center; }
+.stat-n {
+  font-size: 24px; font-weight: 600; font-family: var(--mono);
+  line-height: 1;
+}
+.stat-n.g { color: var(--green); }
+.stat-n.y { color: var(--yellow); }
+.stat-n.d { color: var(--text3); }
+.stat-n.r { color: var(--red); }
+.stat-l { font-size: 10px; color: var(--text2); margin-top: 4px; }
+
+/* ─── SUBMIT BUTTON ──────────────────────────────────────── */
+.fab-wrap {
+  position: sticky; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 0 16px; margin-top: 4px;
+}
+.fab {
+  width: 100%; padding: 15px;
+  background: var(--blue);
+  color: #fff; border: none; border-radius: 12px;
+  font-family: var(--sans); font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 4px 24px rgba(47,129,247,.35);
+  transition: all .15s; -webkit-tap-highlight-color: transparent;
+}
+.fab:active:not(:disabled) { transform: scale(.98); opacity: .9; }
+.fab:disabled {
+  background: var(--card2); color: var(--text3);
+  box-shadow: none; cursor: not-allowed;
+}
+.fab .spin {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  border-radius: 50%; animation: rotate .65s linear infinite;
+  display: none; flex-shrink: 0;
+}
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+/* ─── TOAST ──────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 90px; left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 9px 18px;
+  font-size: 13px; white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: all .22s; z-index: 999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.ok   { border-color: var(--green); color: var(--green); }
+.toast.fail { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pinScreen">
+  <div class="pin-logo">🏭</div>
+  <div class="pin-setup-step" id="pinStepLabel" style="display:none">ตั้ง PIN ใหม่</div>
+  <div class="pin-title" id="pinTitle">Warehouse Expenses</div>
+  <div class="pin-sub" id="pinSub">กรอก PIN 6 หลักเพื่อเข้าใช้งาน</div>
+  <div class="pin-dots" id="pinDots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+    <div class="pin-dot" id="pd4"></div>
+    <div class="pin-dot" id="pd5"></div>
+  </div>
+  <div class="numpad">
+    <button class="num-btn" onclick="pinPress('1')">1</button>
+    <button class="num-btn" onclick="pinPress('2')">2</button>
+    <button class="num-btn" onclick="pinPress('3')">3</button>
+    <button class="num-btn" onclick="pinPress('4')">4</button>
+    <button class="num-btn" onclick="pinPress('5')">5</button>
+    <button class="num-btn" onclick="pinPress('6')">6</button>
+    <button class="num-btn" onclick="pinPress('7')">7</button>
+    <button class="num-btn" onclick="pinPress('8')">8</button>
+    <button class="num-btn" onclick="pinPress('9')">9</button>
+    <button class="num-btn empty"></button>
+    <button class="num-btn" onclick="pinPress('0')">0</button>
+    <button class="num-btn del" onclick="pinDel()">⌫</button>
+  </div>
+  <div class="pin-error-msg" id="pinErr"></div>
+</div>
+
+<!-- APP CONTENT -->
+<div id="appContent">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">🏭</div>
+    <div>
+      <h1>Warehouse Expenses</h1>
+      <p>Receipt &amp; Invoice Scanner</p>
+    </div>
+  </div>
+  <div class="gear-btn" onclick="openDrawer()">⚙️</div>
+</div>
+
+<!-- SETTINGS DRAWER -->
+<div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span>⚙️ ตั้งค่า</span>
+    <div class="close-btn" onclick="closeDrawer()">✕</div>
+  </div>
+  <div class="drawer-body">
+    <div>
+      <label class="field-label">Claude API Key</label>
+      <input class="field-input" type="password" id="inApiKey" placeholder="sk-ant-...">
+    </div>
+    <div>
+      <label class="field-label">Apps Script URL</label>
+      <input class="field-input" type="url" id="inScriptUrl"
+             placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <button class="save-config-btn" onclick="saveConfig()">บันทึก</button>
+    <div id="configStatus" class="status-chip" style="display:none"></div>
+    <button class="save-config-btn" style="background:var(--card2);color:var(--text2);border:1px solid var(--border);margin-top:4px;" onclick="closeDrawer();resetPin()">🔐 เปลี่ยน PIN</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- Upload -->
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="fileInput" multiple accept="image/*,application/pdf"
+           onchange="addFiles(this.files)">
+    <div class="upload-icon">📎</div>
+    <div class="upload-title">แตะเพื่อเลือกไฟล์</div>
+    <div class="upload-sub">รูปภาพ / PDF หลายไฟล์พร้อมกันได้</div>
+    <div class="upload-badge">JPG · PNG · PDF</div>
+  </div>
+
+  <!-- Queue -->
+  <div id="queueWrap" style="display:none">
+    <div class="section-label">
+      ไฟล์ในคิว
+      <span class="badge" id="qBadge">0</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;" id="qList"></div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary" id="summary">
+    <div class="summary-title">ผลลัพธ์การประมวลผล</div>
+    <div class="summary-grid">
+      <div class="stat"><div class="stat-n g" id="sInsert">0</div><div class="stat-l">เพิ่มใหม่</div></div>
+      <div class="stat"><div class="stat-n y" id="sUpdate">0</div><div class="stat-l">อัปเดต</div></div>
+      <div class="stat"><div class="stat-n d" id="sSkip">0</div><div class="stat-l">ซ้ำ/ข้าม</div></div>
+      <div class="stat"><div class="stat-n r" id="sError">0</div><div class="stat-l">ผิดพลาด</div></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- FAB -->
+<div class="fab-wrap">
+  <button class="fab" id="fabBtn" onclick="runAll()" disabled>
+    <span class="spin" id="fabSpin"></span>
+    <span id="fabLabel">เลือกไฟล์ก่อน</span>
+  </button>
+</div>
+
+</div><!-- /appContent -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CATEGORIES ───────────────────────────────────────────────
+const CATS = [
+  "Meals","Utilities","Repairs & Maintenance",
+  "Mortgage Interest/Loan Interest","Supplies","Equipment",
+  "Vehicle & Fuel","Property Tax","Insurance","Agent",
+  "Marketing & Software","Accounting","Lawyer","Travel",
+  "Bank Charges","Other"
+];
+
+// ─── STATE ────────────────────────────────────────────────────
+let queue   = [];   // { file, status, detail, thumb }
+let running = false;
+const stats = { insert:0, update:0, skip:0, error:0 };
+
+// ─── CONFIG ───────────────────────────────────────────────────
+const LS = { KEY:'wh_api_key', URL:'wh_script_url' };
+
+function loadConfig() {
+  document.getElementById('inApiKey').value    = localStorage.getItem(LS.KEY) || '';
+  document.getElementById('inScriptUrl').value = localStorage.getItem(LS.URL) || '';
+}
+
+function saveConfig() {
+  const k = document.getElementById('inApiKey').value.trim();
+  const u = document.getElementById('inScriptUrl').value.trim();
+  if (!k || !u) { showStatus('กรุณากรอกให้ครบ','err'); return; }
+  localStorage.setItem(LS.KEY, k);
+  localStorage.setItem(LS.URL, u);
+  showStatus('บันทึกแล้ว ✓','ok');
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('configStatus');
+  el.style.display = 'inline-flex';
+  el.className = 'status-chip ' + (type === 'ok' ? 'ok' : 'err');
+  el.innerHTML = `<span class="dot"></span>${msg}`;
+}
+
+function openDrawer()  { document.getElementById('drawer').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+
+// ─── FILE HANDLING ────────────────────────────────────────────
+function addFiles(files) {
+  for (const f of files) queue.push({ file:f, status:'pending', detail:'รอดำเนินการ', thumb:null });
+  document.getElementById('fileInput').value = '';
+  renderQueue();
+  updateFab();
+}
+
+function renderQueue() {
+  const wrap = document.getElementById('queueWrap');
+  const list = document.getElementById('qList');
+  wrap.style.display = queue.length ? 'flex' : 'none';
+  if (queue.length) wrap.style.flexDirection = 'column';
+  document.getElementById('qBadge').textContent = queue.length;
+
+  list.innerHTML = queue.map((q,i) => `
+    <div class="queue-item ${q.status}" id="qi${i}">
+      <div class="thumb" id="th${i}">
+        ${q.thumb ? `<img src="${q.thumb}">` : fileEmoji(q.file.name)}
+      </div>
+      <div class="item-body">
+        <div class="item-name">${q.file.name}</div>
+        <div class="item-sub ${subClass(q.status)}" id="qs${i}">${q.detail}</div>
+      </div>
+      <div class="dot-status ${q.status}" id="qd${i}"></div>
+    </div>`).join('');
+
+  // Load thumbnails for images
+  queue.forEach((q,i) => {
+    if (!q.thumb && q.file.type.startsWith('image/')) {
+      const r = new FileReader();
+      r.onload = e => {
+        q.thumb = e.target.result;
+        const el = document.getElementById('th'+i);
+        if (el) el.innerHTML = `<img src="${e.target.result}">`;
+      };
+      r.readAsDataURL(q.file);
+    }
+  });
+}
+
+function updateQItem(i, status, detail) {
+  queue[i].status = status;
+  queue[i].detail = detail;
+  const card = document.getElementById('qi'+i);
+  const sub  = document.getElementById('qs'+i);
+  const dot  = document.getElementById('qd'+i);
+  if (card) card.className = `queue-item ${status}`;
+  if (sub)  { sub.className = `item-sub ${subClass(status)}`; sub.textContent = detail; }
+  if (dot)  dot.className   = `dot-status ${status}`;
+}
+
+function fileEmoji(name) {
+  return /pdf/i.test(name) ? '📄' : '🖼️';
+}
+function subClass(s) {
+  return { pending:'dim', processing:'warn', done:'ok', skipped:'dim', error:'err' }[s] || 'dim';
+}
+
+function updateFab() {
+  const pending = queue.filter(q => q.status === 'pending').length;
+  const btn = document.getElementById('fabBtn');
+  btn.disabled = pending === 0 || running;
+  document.getElementById('fabLabel').textContent =
+    running ? 'กำลังประมวลผล...' :
+    pending ? `กรอก ${pending} ไฟล์ลง Sheet` : 'เสร็จสิ้น';
+}
+
+// ─── MAIN PROCESS ─────────────────────────────────────────────
+async function runAll() {
+  const apiKey    = localStorage.getItem(LS.KEY) || '';
+  const scriptUrl = localStorage.getItem(LS.URL) || '';
+  if (!apiKey)    return toast('ใส่ Claude API Key ใน ⚙️ ก่อน', 'fail');
+  if (!scriptUrl) return toast('ใส่ Apps Script URL ใน ⚙️ ก่อน', 'fail');
+
+  running = true;
+  stats.insert = stats.update = stats.skip = stats.error = 0;
+  document.getElementById('fabSpin').style.display = 'block';
+  document.getElementById('summary').classList.remove('show');
+  updateFab();
+
+  for (let i = 0; i < queue.length; i++) {
+    if (queue[i].status !== 'pending') continue;
+
+    try {
+      // Step 1 — base64
+      updateQItem(i, 'processing', 'อ่านไฟล์...');
+      const b64full = await readBase64(queue[i].file);
+      const b64     = b64full.split(',')[1];
+      const mime    = queue[i].file.type || 'image/jpeg';
+
+      // Step 2 — Claude OCR
+      updateQItem(i, 'processing', 'AI วิเคราะห์ใบเสร็จ...');
+      const extracted = await callClaude(apiKey, b64, mime);
+
+      // Step 3 — Upload to Drive
+      updateQItem(i, 'processing', 'อัปโหลด Google Drive...');
+      const docType   = extracted.docType || 'Receipt';
+      const yearMonth = ym(extracted.dateReceipt || extracted.dateInvoice);
+      const ext       = queue[i].file.name.split('.').pop() || 'jpg';
+      const fileName  = `${extracted.dateReceipt || yearMonth}_${safe(extracted.vendor)}_${docType}.${ext}`;
+
+      const upResp = await postScript(scriptUrl, {
+        action: 'uploadFile', fileName, base64Data: b64, mimeType: mime, yearMonth
+      });
+      if (!upResp.success) throw new Error('Drive: ' + (upResp.error || 'upload failed'));
+
+      const receiptLink = docType === 'Receipt' ? upResp.fileUrl : '';
+      const invoiceLink = docType === 'Invoice' ? upResp.fileUrl : '';
+
+      // Step 4 — Save to Sheet
+      updateQItem(i, 'processing', 'กรอกลง Sheet...');
+      const saveResp = await postScript(scriptUrl, {
+        action: 'saveRecord',
+        ...extracted, receiptLink, invoiceLink, docType
+      });
+      if (!saveResp.success) throw new Error('Sheet: ' + (saveResp.error || 'save failed'));
+
+      if      (saveResp.action === 'skipped')  { stats.skip++;   updateQItem(i,'skipped', `ซ้ำ — ข้ามแล้ว`); }
+      else if (saveResp.action === 'updated')  { stats.update++; updateQItem(i,'done',    `อัปเดต row ${saveResp.row} ✓`); }
+      else                                     { stats.insert++; updateQItem(i,'done',    `เพิ่ม row ${saveResp.row} ✓`); }
+
+    } catch (err) {
+      stats.error++;
+      updateQItem(i, 'error', err.message || 'ผิดพลาด');
+    }
+  }
+
+  running = false;
+  document.getElementById('fabSpin').style.display = 'none';
+  updateFab();
+  showSummary();
+  toast('ประมวลผลเสร็จแล้ว', 'ok');
+}
+
+// ─── CLAUDE API ───────────────────────────────────────────────
+async function callClaude(apiKey, b64, mime) {
+  const prompt = `You are a receipt/invoice data extractor for a Canadian warehouse business.
+Analyze the image and return ONLY a valid JSON object — no markdown, no explanation.
+
+Available categories: ${CATS.join(', ')}
+
+Return exactly this JSON:
+{
+  "dateReceipt":   "YYYY-MM-DD or empty string",
+  "dateInvoice":   "YYYY-MM-DD or empty string",
+  "invoiceNum":    "invoice/receipt number or empty string",
+  "vendor":        "vendor or company name",
+  "category":      "one category from the list above",
+  "description":   "brief description of purchase",
+  "preTax":        "pre-tax amount as numeric string e.g. 45.00",
+  "gstHst":        "tax amount as numeric string",
+  "total":         "total amount as numeric string",
+  "paymentMethod": "Cash / Credit Card / Debit / Interac / Cheque / Wire Transfer / Other",
+  "docType":       "Invoice or Receipt",
+  "notes":         "any relevant notes or empty string"
+}
+
+Rules:
+- docType: use Invoice if header says INVOICE, otherwise Receipt
+- If tax not shown separately, estimate: Ontario HST = 13% of pre-tax
+- Always pick the closest category from the list only`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
+          { type: 'text',  text: prompt }
+        ]
+      }]
+    })
+  });
+
+  if (!res.ok) {
+    const e = await res.json();
+    throw new Error('Claude: ' + (e.error?.message || res.status));
+  }
+
+  const data = await res.json();
+  const raw  = (data.content?.[0]?.text || '').replace(/```json|```/g,'').trim();
+  return JSON.parse(raw);
+}
+
+// ─── APPS SCRIPT POST ─────────────────────────────────────────
+async function postScript(url, payload) {
+  const res = await fetch(url, {
+    method: 'POST',
+    // text/plain avoids CORS preflight for Apps Script
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────
+function readBase64(file) {
+  return new Promise((res,rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = () => rej(new Error('อ่านไฟล์ไม่ได้'));
+    r.readAsDataURL(file);
+  });
+}
+
+function ym(dateStr) {
+  if (dateStr && /^\d{4}-\d{2}/.test(dateStr)) return dateStr.slice(0,7);
+  return new Date().toISOString().slice(0,7);
+}
+
+function safe(str) {
+  return (str || 'Unknown')
+    .replace(/[^\w\u0E00-\u0E7F\s]/g,'')
+    .replace(/\s+/g,'_')
+    .slice(0,30);
+}
+
+function showSummary() {
+  document.getElementById('sInsert').textContent = stats.insert;
+  document.getElementById('sUpdate').textContent = stats.update;
+  document.getElementById('sSkip').textContent   = stats.skip;
+  document.getElementById('sError').textContent  = stats.error;
+  document.getElementById('summary').classList.add('show');
+}
+
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = `toast show ${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+// ─── PIN SYSTEM ───────────────────────────────────────────────
+const PIN_KEY = 'wh_pin_hash';
+const PIN_LEN = 6;
+let pinBuffer = '', pinSetupStep = 0, pinTemp = '';
+
+function hashPin(pin) {
+  let h = 0;
+  for (let i = 0; i < pin.length; i++) h = Math.imul(31, h) + pin.charCodeAt(i) | 0;
+  return h.toString(36) + pin.length;
+}
+
+function initPin() {
+  localStorage.getItem(PIN_KEY) ? showPinEntry() : startPinSetup();
+}
+
+function showPinEntry() {
+  pinBuffer = ''; pinSetupStep = 0;
+  document.getElementById('pinStepLabel').style.display = 'none';
+  document.getElementById('pinTitle').textContent = 'Warehouse Expenses';
+  document.getElementById('pinSub').textContent   = 'กรอก PIN 6 หลักเพื่อเข้าใช้งาน';
+  updateDots();
+}
+
+function startPinSetup() {
+  pinBuffer = ''; pinSetupStep = 1; pinTemp = '';
+  document.getElementById('pinStepLabel').style.display  = 'block';
+  document.getElementById('pinStepLabel').textContent    = 'ตั้ง PIN ใหม่';
+  document.getElementById('pinTitle').textContent = 'สร้าง PIN';
+  document.getElementById('pinSub').textContent   = 'ตั้ง PIN 6 หลักสำหรับเข้าใช้งาน';
+  document.getElementById('pinErr').textContent   = '';
+  updateDots();
+}
+
+function pinPress(digit) {
+  if (pinBuffer.length >= PIN_LEN) return;
+  pinBuffer += digit; updateDots();
+  if (pinBuffer.length === PIN_LEN) setTimeout(handlePinComplete, 120);
+}
+
+function pinDel() {
+  if (!pinBuffer.length) return;
+  pinBuffer = pinBuffer.slice(0,-1); updateDots();
+}
+
+function updateDots() {
+  for (let i = 0; i < PIN_LEN; i++) {
+    const d = document.getElementById('pd'+i);
+    d.classList.toggle('filled', i < pinBuffer.length);
+    d.classList.remove('error');
+  }
+}
+
+function pinError(msg) {
+  for (let i = 0; i < PIN_LEN; i++) document.getElementById('pd'+i).classList.add('error');
+  document.getElementById('pinErr').textContent = msg;
+  setTimeout(() => { pinBuffer = ''; updateDots(); document.getElementById('pinErr').textContent = ''; }, 900);
+}
+
+function handlePinComplete() {
+  const stored = localStorage.getItem(PIN_KEY);
+  if (pinSetupStep === 1) {
+    pinTemp = pinBuffer; pinBuffer = ''; pinSetupStep = 2;
+    document.getElementById('pinStepLabel').textContent = 'ยืนยัน PIN';
+    document.getElementById('pinSub').textContent = 'กรอก PIN อีกครั้งเพื่อยืนยัน';
+    updateDots();
+  } else if (pinSetupStep === 2) {
+    if (pinBuffer === pinTemp) {
+      localStorage.setItem(PIN_KEY, hashPin(pinBuffer)); unlockApp();
+    } else {
+      pinError('PIN ไม่ตรงกัน ลองใหม่');
+      pinTemp = ''; pinSetupStep = 1;
+      document.getElementById('pinStepLabel').textContent = 'ตั้ง PIN ใหม่';
+      document.getElementById('pinSub').textContent = 'ตั้ง PIN 6 หลักสำหรับเข้าใช้งาน';
+    }
+  } else {
+    hashPin(pinBuffer) === stored ? unlockApp() : pinError('PIN ไม่ถูกต้อง');
+  }
+}
+
+function unlockApp() {
+  document.getElementById('pinScreen').style.display  = 'none';
+  document.getElementById('appContent').style.display = 'block';
+  loadConfig();
+}
+
+function resetPin() {
+  localStorage.removeItem(PIN_KEY);
+  document.getElementById('appContent').style.display = 'none';
+  document.getElementById('pinScreen').style.display  = 'flex';
+  startPinSetup();
+}
+
+// ─── DRAG & DROP ──────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  addFiles(e.dataTransfer.files);
+});
+
+// ─── INIT ─────────────────────────────────────────────────────
+initPin();
+</script>
+</body>
+</html>
