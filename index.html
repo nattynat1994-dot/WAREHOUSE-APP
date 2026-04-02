@@ -646,14 +646,15 @@ async function runAll() {
 
       // Step 2 — Claude OCR
       updateQItem(i, 'processing', 'AI วิเคราะห์ใบเสร็จ...');
-      const extracted = await callClaude(apiKey, b64, mime);
+      const records = await callClaude(apiKey, b64, mime);
 
-      // Step 3 — Upload to Drive
+      // Step 3 — Upload to Drive (once for first record)
       updateQItem(i, 'processing', 'อัปโหลด Google Drive...');
-      const docType   = extracted.docType || 'Receipt';
-      const yearMonth = ym(extracted.dateReceipt || extracted.dateInvoice);
+      const firstRec  = records[0];
+      const docType   = firstRec.docType || 'Receipt';
+      const yearMonth = ym(firstRec.dateReceipt || firstRec.dateInvoice);
       const ext       = queue[i].file.name.split('.').pop() || 'jpg';
-      const fileName  = `${extracted.dateReceipt || yearMonth}_${safe(extracted.vendor)}_${docType}.${ext}`;
+      const fileName  = `${firstRec.dateReceipt || yearMonth}_${safe(firstRec.vendor)}_${docType}.${ext}`;
 
       const upResp = await postScript(scriptUrl, {
         action: 'uploadFile', fileName, base64Data: b64, mimeType: mime, yearMonth
@@ -663,17 +664,27 @@ async function runAll() {
       const receiptLink = docType === 'Receipt' ? upResp.fileUrl : '';
       const invoiceLink = docType === 'Invoice' ? upResp.fileUrl : '';
 
-      // Step 4 — Save to Sheet
-      updateQItem(i, 'processing', 'กรอกลง Sheet...');
-      const saveResp = await postScript(scriptUrl, {
-        action: 'saveRecord',
-        ...extracted, receiptLink, invoiceLink, docType
-      });
-      if (!saveResp.success) throw new Error('Sheet: ' + (saveResp.error || 'save failed'));
-
-      if      (saveResp.action === 'skipped')  { stats.skip++;   updateQItem(i,'skipped', `ซ้ำ — ข้ามแล้ว`); }
-      else if (saveResp.action === 'updated')  { stats.update++; updateQItem(i,'done',    `อัปเดต row ${saveResp.row} ✓`); }
-      else                                     { stats.insert++; updateQItem(i,'done',    `เพิ่ม row ${saveResp.row} ✓`); }
+      // Step 4 — Save all records
+      updateQItem(i, 'processing', `กรอกลง Sheet ${records.length} แถว...`);
+      let lastAction = 'inserted', lastRow = 0;
+      for (let r = 0; r < records.length; r++) {
+        const rec = records[r];
+        const recReceiptLink = r === 0 ? receiptLink : '';
+        const recInvoiceLink = r === 0 ? invoiceLink : '';
+        const saveResp = await postScript(scriptUrl, {
+          action: 'saveRecord',
+          ...rec, receiptLink: recReceiptLink, invoiceLink: recInvoiceLink, docType: rec.docType || 'Receipt'
+        });
+        if (!saveResp.success) throw new Error('Sheet: ' + (saveResp.error || 'save failed'));
+        lastAction = saveResp.action; lastRow = saveResp.row;
+        if (saveResp.action === 'skipped') stats.skip++;
+        else if (saveResp.action === 'updated') stats.update++;
+        else stats.insert++;
+      }
+      const label = records.length > 1 ? `${records.length} แถว` : `row ${lastRow}`;
+      if      (lastAction === 'skipped') updateQItem(i,'skipped', `ซ้ำ — ข้ามแล้ว`);
+      else if (lastAction === 'updated') updateQItem(i,'done',    `อัปเดต ${label} ✓`);
+      else                               updateQItem(i,'done',    `เพิ่ม ${label} ✓`);
 
     } catch (err) {
       stats.error++;
@@ -691,11 +702,18 @@ async function runAll() {
 // ─── CLAUDE API ───────────────────────────────────────────────
 async function callClaude(apiKey, b64, mime) {
   const prompt = `You are a receipt/invoice data extractor for a Canadian warehouse business.
-Analyze the image and return ONLY a valid JSON object — no markdown, no explanation.
+Analyze the image and return ONLY a valid JSON array — no markdown, no explanation.
 
 Available categories: ${CATS.join(', ')}
 
-Return exactly this JSON:
+IMPORTANT - Interac e-Transfer Rule:
+If the document shows an Interac e-Transfer payment, return 2 separate records:
+1. The actual transfer amount (vendor = recipient, category = appropriate, total = full amount MINUS $1)
+2. Service fee: vendor="Scotiabank", category="Bank Charges", description="Interac e-Transfer Fee", total="1.00", preTax="1.00", gstHst="0.00", paymentMethod="Interac"
+
+For all other documents, return array with 1 record.
+
+Each record structure:
 {
   "dateReceipt":   "YYYY-MM-DD or empty string",
   "dateInvoice":   "YYYY-MM-DD or empty string",
@@ -712,6 +730,7 @@ Return exactly this JSON:
 }
 
 Rules:
+- Always return a JSON array [ {...} ] even for single records
 - docType: use Invoice if header says INVOICE, otherwise Receipt
 - If tax not shown separately, estimate: Ontario HST = 13% of pre-tax
 - Always pick the closest category from the list only`;
@@ -744,7 +763,8 @@ Rules:
 
   const data = await res.json();
   const raw  = (data.content?.[0]?.text || '').replace(/```json|```/g,'').trim();
-  return JSON.parse(raw);
+  const parsed = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
 // ─── APPS SCRIPT POST ─────────────────────────────────────────
