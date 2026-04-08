@@ -657,7 +657,14 @@ async function runAll() {
       const fileName  = `${firstRec.dateReceipt || yearMonth}_${safe(firstRec.vendor)}_${docType}.${ext}`;
 
       const upResp = await postScript(scriptUrl, {
-        action: 'uploadFile', fileName, base64Data: b64, mimeType: mime, yearMonth
+        action: 'uploadFile',
+        base64Data: b64,
+        mimeType: mime,
+        yearMonth,
+        docType:     firstRec.docType     || 'Receipt',
+        dateReceipt: firstRec.dateReceipt || '',
+        total:       firstRec.total       || '0.00',
+        vendor:      firstRec.vendor      || 'Unknown'
       });
       if (!upResp.success) throw new Error('Drive: ' + (upResp.error || 'upload failed'));
 
